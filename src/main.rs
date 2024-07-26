@@ -63,7 +63,7 @@ fn get_string_rotation(values: String) -> Option<Rotation> {
         .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
         .collect();
 
-    let y = split_3[1]
+    let y = split_4[0]
         .chars()
         .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
         .collect();
@@ -123,8 +123,15 @@ fn list_files(path: &str) -> Option<(Vec<FileData>, usize)> {
         }
 
         let file_path = entry_data.path().to_string_lossy().to_string();
+        let file_name = match entry_data.file_name().into_string() {
+            Ok(file_name) => file_name,
+            Err(_) => continue,
+        };
 
-        files.push(FileData { path: file_path });
+        files.push(FileData {
+            path: file_path,
+            file_name,
+        });
     }
 
     if files.is_empty() {
@@ -185,31 +192,54 @@ fn get_parking_uids(file: &Vec<String>, index: usize) -> Option<(Vec<String>, Ve
     let mut node_uids: Vec<String> = Vec::new();
     let mut node_flags: Vec<String> = Vec::new();
 
-    let mut node_flags_found = false;
+    let mut node_uids_found = false;
     for item in file.iter().skip(index + 5) {
-        if item.contains("}") {
+        if item.contains("}") || item.contains("]") {
             break;
         }
 
-        if item.contains("array_u32 node_flags [") {
+        if !node_uids_found && item.contains("array_u64 node_uids [") {
+            node_uids_found = true;
+            continue;
+        }
+
+        if node_uids_found {
+            let node_id_string: String = item
+                .chars()
+                .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
+                .collect();
+
+            println!("{:?}", node_id_string);
+
+            node_uids.push(node_id_string);
+            continue;
+        }
+    }
+
+    let mut node_flags_found = false;
+    for item in file.iter().skip(index + 5 + node_uids.len() + 2) {
+        if item.contains("}") || item.contains("]") {
+            break;
+        }
+
+        if !node_flags_found && item.contains("array_u32 node_flags [") {
             node_flags_found = true;
             continue;
         }
 
-        let node_id_string: String = item
-            .chars()
-            .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
-            .collect();
-
         if node_flags_found {
+            let node_id_string: String = item
+                .chars()
+                .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
+                .collect();
+
             node_flags.push(node_id_string);
             continue;
-        } else {
-            node_uids.push(node_id_string);
         }
     }
 
     if node_uids.is_empty() || node_flags.is_empty() {
+        println!("{:?}", node_flags);
         return None;
     }
 
@@ -285,7 +315,7 @@ fn get_parking_data_company(
     return Some(parking_data);
 }
 
-fn get_file_company_data(file: &Vec<String>) -> Option<Vec<CompanyData>> {
+fn get_file_company_data(file: &Vec<String>, file_name: &String) -> Option<Vec<CompanyData>> {
     let (companies, nodes_index): (Vec<CompanyFindVecData>, usize) = match get_file_companies(file)
     {
         Some(companies) => companies,
@@ -309,6 +339,7 @@ fn get_file_company_data(file: &Vec<String>) -> Option<Vec<CompanyData>> {
         let company_data: CompanyData = CompanyData {
             name: item.name,
             city_name: item.city_name,
+            file_name: file_name.clone(),
             position: company_position,
             parking: parking_data,
         };
@@ -332,7 +363,7 @@ fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CompanyData>> {
             None => return,
         };
 
-        match get_file_company_data(&file) {
+        match get_file_company_data(&file, &item.file_name) {
             Some(companies) => {
                 let mut all_companies = all_companies.lock().unwrap();
                 all_companies.extend(companies);
@@ -354,7 +385,9 @@ fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CompanyData>> {
 }
 
 fn main() {
-    let (files, total_files): (Vec<FileData>, usize) = match list_files("path") {
+    let (files, total_files): (Vec<FileData>, usize) = match list_files(
+        "C:/Users/coffe/Documents/Euro Truck Simulator 2/mod/user_map/map/exportMap",
+    ) {
         Some(dir_content) => dir_content,
         None => {
             return;
@@ -363,7 +396,10 @@ fn main() {
 
     println!("Total files: {}", total_files);
     match get_all_company_map(&files) {
-        Some(res) => save_as_json(res, "path"),
-        None => return,
+        Some(res) => save_as_json(res, "C:/Users/coffe/Desktop/dev/test.json"),
+        None => {
+            println!("No companies found");
+            return;
+        }
     };
 }

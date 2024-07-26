@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct CompanyData {
     pub name: String,
     pub city_name: String,
+    pub file_name: String,
     pub position: Position,
     pub parking: Vec<CompanyParking>,
 }
