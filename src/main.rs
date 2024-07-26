@@ -1,7 +1,7 @@
 mod strucs;
 
 use rayon::prelude::*;
-use std::fs::{read_dir, File};
+use std::fs::{read_dir, write, File};
 use std::io::Read;
 use std::sync::Mutex;
 use strucs::company_data::{CompanyData, CompanyFindVecData, CompanyParking, Position, Rotation};
@@ -33,6 +33,18 @@ fn read_file_text_vec(path: &str) -> Option<Vec<String>> {
     };
 
     return Some(file.lines().map(|s| s.to_string()).collect());
+}
+
+fn save_as_json(data: Vec<CompanyData>, path: &str) -> bool {
+    let json_data = match serde_json::to_string_pretty(&data) {
+        Ok(json_data) => json_data,
+        Err(_) => return false,
+    };
+
+    match write(path, json_data) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
 }
 
 fn get_string_rotation(values: String) -> Option<Rotation> {
@@ -110,17 +122,9 @@ fn list_files(path: &str) -> Option<(Vec<FileData>, usize)> {
             continue;
         }
 
-        let file_name = match entry_data.file_name().into_string() {
-            Ok(file_name) => file_name,
-            Err(_) => continue,
-        };
         let file_path = entry_data.path().to_string_lossy().to_string();
 
-        files.push(FileData {
-            name: file_name,
-            path: file_path,
-            extension: file_extension,
-        });
+        files.push(FileData { path: file_path });
     }
 
     if files.is_empty() {
@@ -258,18 +262,20 @@ fn get_parking_data_company(
         };
 
     let mut parking_data: Vec<CompanyParking> = Vec::new();
-    for (_i, item) in node_uids.iter().enumerate() {
+    for (i, item) in node_uids.iter().enumerate() {
         let (position, rotation): (Position, Rotation) =
             match get_node_item_data(file, item.clone(), index_node_uid) {
                 Some(res) => res,
                 None => continue,
             };
 
-        parking_data.push(CompanyParking {
-            dificulty: "test".to_string(),
+        let company_parking_data: CompanyParking = CompanyParking {
+            dificulty: node_flags[i].clone(),
             position,
             rotation,
-        });
+        };
+
+        parking_data.push(company_parking_data);
     }
 
     if parking_data.is_empty() {
@@ -306,7 +312,6 @@ fn get_file_company_data(file: &Vec<String>) -> Option<Vec<CompanyData>> {
             position: company_position,
             parking: parking_data,
         };
-        println!("{:?}", company_data.city_name);
 
         companies_data.push(company_data);
     }
@@ -357,5 +362,8 @@ fn main() {
     };
 
     println!("Total files: {}", total_files);
-    get_all_company_map(&files);
+    match get_all_company_map(&files) {
+        Some(res) => save_as_json(res, "path"),
+        None => return,
+    };
 }
