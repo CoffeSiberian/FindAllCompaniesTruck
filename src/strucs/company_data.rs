@@ -1,7 +1,8 @@
 pub struct CompanyData {
     pub name: String,
     pub city_name: String,
-    pub parking: CompanyParking,
+    pub position: Position,
+    pub parking: Vec<CompanyParking>,
 }
 
 pub struct CompanyParking {
@@ -21,4 +22,10 @@ pub struct Rotation {
     pub x: String,
     pub y: String,
     pub z: String,
+}
+pub struct CompanyFindVecData {
+    pub name: String,
+    pub city_name: String,
+    pub node_uid: String,
+    pub index_company: usize,
 }
