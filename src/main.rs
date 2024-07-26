@@ -1,7 +1,9 @@
 mod strucs;
 
+use rayon::prelude::*;
 use std::fs::{read_dir, File};
 use std::io::Read;
+use std::sync::Mutex;
 use strucs::company_data::{CompanyData, CompanyFindVecData, CompanyParking, Position, Rotation};
 use strucs::file_data::FileData;
 
@@ -265,8 +267,8 @@ fn get_parking_data_company(
 
         parking_data.push(CompanyParking {
             dificulty: "test".to_string(),
-            position: position,
-            rotation: rotation,
+            position,
+            rotation,
         });
     }
 
@@ -298,12 +300,13 @@ fn get_file_company_data(file: &Vec<String>) -> Option<Vec<CompanyData>> {
                 None => continue,
             };
 
-        let company_data = CompanyData {
+        let company_data: CompanyData = CompanyData {
             name: item.name,
             city_name: item.city_name,
             position: company_position,
             parking: parking_data,
         };
+        println!("{:?}", company_data.city_name);
 
         companies_data.push(company_data);
     }
@@ -316,38 +319,42 @@ fn get_file_company_data(file: &Vec<String>) -> Option<Vec<CompanyData>> {
 }
 
 fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CompanyData>> {
-    let mut all_companies: Vec<CompanyData> = Vec::new();
+    let all_companies: Mutex<Vec<CompanyData>> = Mutex::new(Vec::new());
 
-    for item in file_data {
+    file_data.par_iter().for_each(|item| {
         let file = match read_file_text_vec(&item.path) {
             Some(res) => res,
-            None => continue,
+            None => return,
         };
 
         match get_file_company_data(&file) {
             Some(companies) => {
+                let mut all_companies = all_companies.lock().unwrap();
                 all_companies.extend(companies);
             }
-            None => continue,
+            None => return,
         }
-    }
+    });
 
-    if all_companies.is_empty() {
+    let all_companies_check: Vec<CompanyData> = match all_companies.into_inner() {
+        Ok(res) => res,
+        Err(_) => return None,
+    };
+
+    if all_companies_check.is_empty() {
         return None;
     }
 
-    return Some(all_companies);
+    return Some(all_companies_check);
 }
 
 fn main() {
-    let dir_content = match list_files("path") {
+    let (files, total_files): (Vec<FileData>, usize) = match list_files("path") {
         Some(dir_content) => dir_content,
         None => {
             return;
         }
     };
-
-    let (files, total_files) = dir_content;
 
     println!("Total files: {}", total_files);
     get_all_company_map(&files);
