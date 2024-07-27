@@ -1,10 +1,14 @@
 mod strucs;
 
 use rayon::prelude::*;
+use serde_json::to_string_pretty;
+use std::collections::HashSet;
 use std::fs::{read_dir, write, File};
 use std::io::Read;
 use std::sync::Mutex;
-use strucs::company_data::{CompanyData, CompanyFindVecData, CompanyParking, Position, Rotation};
+use strucs::company_data::{
+    CompanyData, CompanyFindVecData, CompanyParking, CompanyParkingType, Position, Rotation,
+};
 use strucs::file_data::FileData;
 
 const CHARS_TO_REMOVE_BASIC: &str = " \"";
@@ -36,7 +40,19 @@ fn read_file_text_vec(path: &str) -> Option<Vec<String>> {
 }
 
 fn save_as_json(data: Vec<CompanyData>, path: &str) -> bool {
-    let json_data = match serde_json::to_string_pretty(&data) {
+    let json_data = match to_string_pretty(&data) {
+        Ok(json_data) => json_data,
+        Err(_) => return false,
+    };
+
+    match write(path, json_data) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+fn save_as_json2(data: Vec<CompanyParkingType>, path: &str) -> bool {
+    let json_data = match to_string_pretty(&data) {
         Ok(json_data) => json_data,
         Err(_) => return false,
     };
@@ -209,8 +225,6 @@ fn get_parking_uids(file: &Vec<String>, index: usize) -> Option<(Vec<String>, Ve
                 .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
                 .collect();
 
-            println!("{:?}", node_id_string);
-
             node_uids.push(node_id_string);
             continue;
         }
@@ -239,7 +253,6 @@ fn get_parking_uids(file: &Vec<String>, index: usize) -> Option<(Vec<String>, Ve
     }
 
     if node_uids.is_empty() || node_flags.is_empty() {
-        println!("{:?}", node_flags);
         return None;
     }
 
@@ -384,10 +397,35 @@ fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CompanyData>> {
     return Some(all_companies_check);
 }
 
+fn get_any_flags_id_not_repeated(companies: &Vec<CompanyData>, path: &str) -> bool {
+    let mut flags_set: HashSet<String> = HashSet::new();
+    let mut flags_vec: Vec<CompanyParkingType> = Vec::new();
+
+    for item in companies {
+        for item2 in item.parking.iter() {
+            let res = flags_set.insert(item2.dificulty.clone());
+
+            if res {
+                let company_parking_type = CompanyParkingType {
+                    dificulty: item2.dificulty.parse::<u16>().unwrap(),
+                    file_name: item.file_name.clone(),
+                };
+
+                flags_vec.push(company_parking_type);
+            }
+        }
+    }
+
+    if flags_vec.is_empty() {
+        return false;
+    }
+
+    save_as_json2(flags_vec, path);
+    return true;
+}
+
 fn main() {
-    let (files, total_files): (Vec<FileData>, usize) = match list_files(
-        "C:/Users/coffe/Documents/Euro Truck Simulator 2/mod/user_map/map/exportMap",
-    ) {
+    let (files, total_files): (Vec<FileData>, usize) = match list_files("path") {
         Some(dir_content) => dir_content,
         None => {
             return;
@@ -395,11 +433,15 @@ fn main() {
     };
 
     println!("Total files: {}", total_files);
-    match get_all_company_map(&files) {
-        Some(res) => save_as_json(res, "C:/Users/coffe/Desktop/dev/test.json"),
+    let companies: Vec<CompanyData> = match get_all_company_map(&files) {
+        Some(res) => res,
         None => {
             println!("No companies found");
             return;
         }
     };
+
+    get_any_flags_id_not_repeated(&companies, "path");
+    save_as_json(companies, "path");
+    return;
 }

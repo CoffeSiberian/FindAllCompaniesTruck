@@ -36,3 +36,9 @@ pub struct CompanyFindVecData {
     pub node_uid: String,
     pub index_company: usize,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct CompanyParkingType {
+    pub dificulty: u16,
+    pub file_name: String,
+}
