@@ -42,3 +42,8 @@ pub struct CompanyParkingType {
     pub dificulty: u16,
     pub file_name: String,
 }
+
+pub struct ValuesFlagsParking<'a> {
+    pub flag_id: &'a str,
+    pub is_hard_parking: bool,
+}

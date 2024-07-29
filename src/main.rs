@@ -1,3 +1,4 @@
+mod flags_parking;
 mod strucs;
 
 use rayon::prelude::*;
