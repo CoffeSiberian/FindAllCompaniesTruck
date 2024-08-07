@@ -8,7 +8,8 @@ use std::fs::{read_dir, write, File};
 use std::io::Read;
 use std::sync::Mutex;
 use strucs::company_data::{
-    CompanyData, CompanyFindVecData, CompanyParking, CompanyParkingType, Position, Rotation,
+    CitiesCompanyData, CompanyData, CompanyFindVecData, CompanyParking, CompanyParkingType,
+    Position, Rotation,
 };
 use strucs::file_data::FileData;
 
@@ -40,7 +41,7 @@ fn read_file_text_vec(path: &str) -> Option<Vec<String>> {
     return Some(file.lines().map(|s| s.to_string()).collect());
 }
 
-fn save_as_json(data: Vec<CompanyData>, path: &str) -> bool {
+fn save_as_json(data: Vec<CitiesCompanyData>, path: &str) -> bool {
     let json_data = match to_string_pretty(&data) {
         Ok(json_data) => json_data,
         Err(_) => return false,
@@ -187,7 +188,7 @@ fn get_file_companies(file: &Vec<String>) -> Option<(Vec<CompanyFindVecData>, us
 
             companies.push(CompanyFindVecData {
                 name: company_name,
-                city_name: city_name,
+                city: city_name,
                 node_uid: node_uid,
                 index_company: i,
             });
@@ -337,7 +338,7 @@ fn get_file_company_data(file: &Vec<String>, file_name: &String) -> Option<Vec<C
     };
 
     let mut companies_data: Vec<CompanyData> = Vec::new();
-    for item in companies {
+    for item in &companies {
         let parking_data: Vec<CompanyParking> =
             match get_parking_data_company(file, item.index_company, nodes_index) {
                 Some(res) => res,
@@ -345,14 +346,14 @@ fn get_file_company_data(file: &Vec<String>, file_name: &String) -> Option<Vec<C
             };
 
         let (company_position, _company_rotation) =
-            match get_node_item_data(file, item.node_uid, nodes_index) {
+            match get_node_item_data(file, item.node_uid.clone(), nodes_index) {
                 Some(res) => res,
                 None => continue,
             };
 
         let company_data: CompanyData = CompanyData {
-            name: item.name,
-            city_name: item.city_name,
+            name: item.name.clone(),
+            city: item.city.clone(),
             file_name: file_name.clone(),
             position: company_position,
             parking: parking_data,
@@ -368,8 +369,9 @@ fn get_file_company_data(file: &Vec<String>, file_name: &String) -> Option<Vec<C
     return Some(companies_data);
 }
 
-fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CompanyData>> {
-    let all_companies: Mutex<Vec<CompanyData>> = Mutex::new(Vec::new());
+fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CitiesCompanyData>> {
+    let all_companies: Mutex<Vec<CitiesCompanyData>> = Mutex::new(Vec::new());
+    let cities_found: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 
     file_data.par_iter().for_each(|item| {
         let file = match read_file_text_vec(&item.path) {
@@ -377,16 +379,39 @@ fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CompanyData>> {
             None => return,
         };
 
-        match get_file_company_data(&file, &item.file_name) {
-            Some(companies) => {
-                let mut all_companies = all_companies.lock().unwrap();
-                all_companies.extend(companies);
-            }
+        let company = match get_file_company_data(&file, &item.file_name) {
+            Some(res) => res,
             None => return,
+        };
+
+        let mut all_companies_data = match all_companies.lock() {
+            Ok(res) => res,
+            Err(_) => return,
+        };
+        let mut cities_found_data = match cities_found.lock() {
+            Ok(res) => res,
+            Err(_) => return,
+        };
+
+        for item in company {
+            if !cities_found_data.contains(item.city.as_str()) {
+                cities_found_data.insert(item.city.clone());
+                all_companies_data.push(CitiesCompanyData {
+                    city_name: item.city.clone(),
+                    companies: vec![item],
+                });
+            } else {
+                for item2 in all_companies_data.iter_mut() {
+                    if item2.city_name == item.city {
+                        item2.companies.push(item);
+                        break;
+                    }
+                }
+            }
         }
     });
 
-    let all_companies_check: Vec<CompanyData> = match all_companies.into_inner() {
+    let all_companies_check: Vec<CitiesCompanyData> = match all_companies.into_inner() {
         Ok(res) => res,
         Err(_) => return None,
     };
@@ -398,6 +423,7 @@ fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CompanyData>> {
     return Some(all_companies_check);
 }
 
+#[allow(dead_code)]
 fn get_any_flags_id_not_repeated(companies: &Vec<CompanyData>, path: &str) -> bool {
     let mut flags_set: HashSet<String> = HashSet::new();
     let mut flags_vec: Vec<CompanyParkingType> = Vec::new();
@@ -408,7 +434,10 @@ fn get_any_flags_id_not_repeated(companies: &Vec<CompanyData>, path: &str) -> bo
 
             if res {
                 let company_parking_type = CompanyParkingType {
-                    dificulty: item2.dificulty.parse::<u16>().unwrap(),
+                    dificulty: match item2.dificulty.parse::<u16>() {
+                        Ok(res) => res,
+                        Err(_) => continue,
+                    },
                     file_name: item.file_name.clone(),
                 };
 
@@ -428,13 +457,11 @@ fn get_any_flags_id_not_repeated(companies: &Vec<CompanyData>, path: &str) -> bo
 fn main() {
     let (files, total_files): (Vec<FileData>, usize) = match list_files("path") {
         Some(dir_content) => dir_content,
-        None => {
-            return;
-        }
+        None => return,
     };
 
     println!("Total files: {}", total_files);
-    let companies: Vec<CompanyData> = match get_all_company_map(&files) {
+    let companies: Vec<CitiesCompanyData> = match get_all_company_map(&files) {
         Some(res) => res,
         None => {
             println!("No companies found");
@@ -442,7 +469,7 @@ fn main() {
         }
     };
 
-    get_any_flags_id_not_repeated(&companies, "path");
+    //get_any_flags_id_not_repeated(&companies, "path");
     save_as_json(companies, "path");
     return;
 }

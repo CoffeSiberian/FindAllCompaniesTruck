@@ -1,5 +1,6 @@
 use super::strucs::company_data::ValuesFlagsParking;
 
+#[allow(dead_code)]
 pub const FLAGS_PARKING: [ValuesFlagsParking; 25] = [
     ValuesFlagsParking {
         flag_id: "245",
