@@ -1,15 +1,16 @@
 mod flags_parking;
 mod strucs;
 
+use flags_parking::FLAGS_PARKING;
 use rayon::prelude::*;
-use serde_json::to_string_pretty;
+use serde_json::{to_string, to_string_pretty};
 use std::collections::HashSet;
 use std::fs::{read_dir, write, File};
 use std::io::Read;
 use std::sync::Mutex;
 use strucs::company_data::{
     CitiesCompanyData, CompanyData, CompanyFindVecData, CompanyParking, CompanyParkingType,
-    Position, Rotation,
+    ExportData, Position, Rotation,
 };
 use strucs::file_data::FileData;
 
@@ -41,8 +42,14 @@ fn read_file_text_vec(path: &str) -> Option<Vec<String>> {
     return Some(file.lines().map(|s| s.to_string()).collect());
 }
 
-fn save_as_json(data: Vec<CitiesCompanyData>, path: &str) -> bool {
-    let json_data = match to_string_pretty(&data) {
+fn save_as_json(data: Vec<CitiesCompanyData>, path: &str, pretty_file: bool) -> bool {
+    let export_data = ExportData { cities: data };
+
+    let json_data = match if pretty_file {
+        to_string_pretty(&export_data)
+    } else {
+        to_string(&export_data)
+    } {
         Ok(json_data) => json_data,
         Err(_) => return false,
     };
@@ -313,9 +320,15 @@ fn get_parking_data_company(
                 Some(res) => res,
                 None => continue,
             };
+        let node_flags_num = node_flags[i].clone();
+        let is_hard_parking = FLAGS_PARKING.iter().find(|&x| x.flag_id == node_flags_num);
 
         let company_parking_data: CompanyParking = CompanyParking {
-            dificulty: node_flags[i].clone(),
+            dificulty: node_flags_num,
+            is_hard_parking: match is_hard_parking {
+                Some(res) => Some(res.is_hard_parking),
+                None => None,
+            },
             position,
             rotation,
         };
@@ -470,6 +483,6 @@ fn main() {
     };
 
     //get_any_flags_id_not_repeated(&companies, "path");
-    save_as_json(companies, "path");
+    save_as_json(companies, "path", true);
     return;
 }

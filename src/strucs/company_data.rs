@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+pub struct ExportData {
+    pub cities: Vec<CitiesCompanyData>,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct CitiesCompanyData {
     pub city_name: String,
     pub companies: Vec<CompanyData>,
@@ -18,6 +23,7 @@ pub struct CompanyData {
 #[derive(Serialize, Deserialize)]
 pub struct CompanyParking {
     pub dificulty: String,
+    pub is_hard_parking: Option<bool>,
     pub position: Position,
     pub rotation: Rotation,
 }
@@ -50,7 +56,6 @@ pub struct CompanyParkingType {
     pub file_name: String,
 }
 
-#[allow(dead_code)]
 pub struct ValuesFlagsParking<'a> {
     pub flag_id: &'a str,
     pub is_hard_parking: bool,
