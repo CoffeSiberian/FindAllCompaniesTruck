@@ -9,8 +9,8 @@ use std::fs::{read_dir, write, File};
 use std::io::Read;
 use std::sync::Mutex;
 use strucs::company_data::{
-    CitiesCompanyData, CompanyData, CompanyFindVecData, CompanyParking, CompanyParkingType,
-    ExportData, Position, Rotation,
+    CitiesCompanyData, CompanyData, CompanyDataToExport, CompanyFindVecData, CompanyParking,
+    CompanyParkingType, ExportData, Position, Rotation,
 };
 use strucs::file_data::FileData;
 
@@ -106,20 +106,35 @@ fn get_string_position(values: String) -> Option<Position> {
     let split_2: Vec<&str> = split_1[1].split("y:").collect::<Vec<&str>>();
     let split_3: Vec<&str> = split_2[1].split("z:").collect::<Vec<&str>>();
 
-    let x = split_2[0]
+    let x_string: String = split_2[0]
         .chars()
         .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
         .collect();
 
-    let y = split_3[0]
+    let y_string: String = split_3[0]
         .chars()
         .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
         .collect();
 
-    let z = split_3[1]
+    let z_string: String = split_3[1]
         .chars()
         .filter(|&c| !CHARS_TO_REMOVE_BASIC.contains(c))
         .collect();
+
+    let x = match x_string.parse::<f64>() {
+        Ok(res) => res,
+        Err(_) => return None,
+    };
+
+    let y = match y_string.parse::<f64>() {
+        Ok(res) => res,
+        Err(_) => return None,
+    };
+
+    let z = match z_string.parse::<f64>() {
+        Ok(res) => res,
+        Err(_) => return None,
+    };
 
     return Some(Position { x, y, z });
 }
@@ -407,16 +422,22 @@ fn get_all_company_map(file_data: &Vec<FileData>) -> Option<Vec<CitiesCompanyDat
         };
 
         for item in company {
+            let company_export = CompanyDataToExport {
+                name: item.name.clone(),
+                file_name: item.file_name.clone(),
+                position: item.position.clone(),
+                parking: item.parking.clone(),
+            };
             if !cities_found_data.contains(item.city.as_str()) {
                 cities_found_data.insert(item.city.clone());
                 all_companies_data.push(CitiesCompanyData {
                     city_name: item.city.clone(),
-                    companies: vec![item],
+                    companies: vec![company_export],
                 });
             } else {
                 for item2 in all_companies_data.iter_mut() {
                     if item2.city_name == item.city {
-                        item2.companies.push(item);
+                        item2.companies.push(company_export);
                         break;
                     }
                 }
@@ -481,6 +502,7 @@ fn main() {
             return;
         }
     };
+    println!("Total cities: {}", companies.len());
 
     //get_any_flags_id_not_repeated(&companies, "path");
     save_as_json(companies, "path", true);

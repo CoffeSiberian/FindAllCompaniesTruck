@@ -8,7 +8,15 @@ pub struct ExportData {
 #[derive(Serialize, Deserialize)]
 pub struct CitiesCompanyData {
     pub city_name: String,
-    pub companies: Vec<CompanyData>,
+    pub companies: Vec<CompanyDataToExport>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CompanyDataToExport {
+    pub name: String,
+    pub file_name: String,
+    pub position: Position,
+    pub parking: Vec<CompanyParking>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -20,7 +28,7 @@ pub struct CompanyData {
     pub parking: Vec<CompanyParking>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CompanyParking {
     pub dificulty: String,
     pub is_hard_parking: Option<bool>,
@@ -28,14 +36,14 @@ pub struct CompanyParking {
     pub rotation: Rotation,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Position {
-    pub x: String,
-    pub y: String,
-    pub z: String,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Rotation {
     pub w: String,
     pub x: String,
